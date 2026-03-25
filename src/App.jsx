@@ -14,8 +14,8 @@ import {
   ║  Replace these two values with your actual Supabase creds.   ║
   ║  Every user who opens the site will be auto-connected.       ║
   ╚═══════════════════════════════════════════════════════════════╝*/
-const SUPABASE_URL = "https://okljqqldzntuptwxoato.supabase.co";   // ← Replace this
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbGpxcWxkem50dXB0d3hvYXRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDQ3NjcsImV4cCI6MjA5MDAyMDc2N30.RE0SehacCAsDdX6uar1I0OsphtuXipc3-H_5_kUTLw8";              // ← Replace this
+const SUPABASE_URL = "https://kbuxisynsybxabqzjdhp.supabase.co";   // ← Replace this
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtidXhpc3luc3lieGFicXpqZGhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NTI0MjMsImV4cCI6MjA5MDAyODQyM30.DbXt9pghyH2K0EyR64-iPS-vIPHM4SI7NG8Z7EwtYkc";              // ← Replace this
 
 /*╔═══════════════════════════════════════════════════════════════╗
   ║  SECTION 2: CONSTANTS                                        ║
