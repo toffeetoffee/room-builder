@@ -231,7 +231,7 @@ return(<TC.Provider value={T}><div className="w-full h-screen flex flex-col over
 {tab==="props"&&<PP obj={sO} room={room} onChange={chP} onDelete={delO} onUA={uA} lk={lk} onTL={()=>setLk(p=>!p)}/>}
 </div>}
 
-<div ref={ctR} className="flex-1 relative overflow-hidden" style={{cursor}}>
+<div ref={ctR} className="flex-1 relative overflow-hidden" style={{cursor:cur}}>
 <canvas ref={cR} className="w-full h-full block" onMouseDown={onD} onMouseMove={onM} onMouseUp={onU} onMouseLeave={onU} onWheel={onW} onTouchStart={e=>{if(e.touches.length===1){const t=e.touches[0];onD({clientX:t.clientX,clientY:t.clientY})}}} onTouchMove={e=>{if(e.touches.length===1){const t=e.touches[0];onM({clientX:t.clientX,clientY:t.clientY})}}} onTouchEnd={onU}/>
 <div className="absolute top-3 left-3 px-2.5 py-1 rounded-md text-xs font-bold tracking-wider select-none" style={{background:ed?T.acD:T.scD,border:`1px solid ${ed?T.acB:`${T.sc}40`}`,color:ed?T.ac:T.sc}}>{ed?"EDITOR":"PLAY"}</div>
 {lk&&<div className="absolute top-3 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-lg text-xs font-semibold select-none" style={{background:T.wnD,border:`1px solid ${T.wn}50`,color:T.wn,animation:"pulse 2s infinite"}}>🔗 Click to link · ESC cancel</div>}
