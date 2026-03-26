@@ -39,9 +39,23 @@ const LY={BG:0,OBJ:1,PL:2};
 const BT={E:"pressE",FT:"floorToggle",FH:"floorHold"};
 let _u=Date.now();const uid=()=>`o${_u++}_${Math.random().toString(36).slice(2,6)}`;
 
-// ── Image cache (keeps GIFs animating across re-renders) ──
+// ── Image cache (keeps GIFs animating — appended to hidden DOM node) ──
 const _IC=new Map();
-function gImg(s){if(!s)return null;if(_IC.has(s))return _IC.get(s);const i=new window.Image();i.crossOrigin="anonymous";i.src=s;_IC.set(s,i);return i}
+let _gifContainer=null;
+function _ensureGifContainer(){
+  if(_gifContainer)return;
+  _gifContainer=document.createElement("div");
+  _gifContainer.style.cssText="position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;overflow:hidden;pointer-events:none;opacity:0";
+  document.body.appendChild(_gifContainer);
+}
+function gImg(s){if(!s)return null;if(_IC.has(s))return _IC.get(s);
+  _ensureGifContainer();
+  const i=new window.Image();i.crossOrigin="anonymous";i.src=s;
+  _IC.set(s,i);
+  // Append to hidden DOM so browser keeps GIF frames cycling
+  _gifContainer.appendChild(i);
+  return i;
+}
 
 const FONTS=[{v:"sans-serif",l:"Sans Serif"},{v:"serif",l:"Serif"},{v:"monospace",l:"Monospace"},{v:"cursive",l:"Cursive"},{v:"fantasy",l:"Fantasy"},{v:"'Georgia',serif",l:"Georgia"},{v:"'Courier New',monospace",l:"Courier"},{v:"'Trebuchet MS',sans-serif",l:"Trebuchet"},{v:"'Palatino',serif",l:"Palatino"},{v:"'Comic Sans MS',cursive",l:"Comic Sans"}];
 
@@ -76,36 +90,261 @@ class Player{constructor(p={}){this.x=p.x??400;this.y=p.y??300;this.size=p.size?
 class Room{constructor(p={}){this.width=p.width??ROOM_W;this.height=p.height??ROOM_H;this.gridSize=p.gridSize??GRID;this.gridOn=p.gridOn??false;this.bgColor=p.bgColor||"#ffffff";this.roomName=p.roomName||"My Room";this.objects=p.objects||[];this.player=p.player||new Player({x:this.width/2,y:this.height/2});this.soundMuted=p.soundMuted??false}add(o){this.objects.push(o)}remove(id){for(const o of this.objects)if(o instanceof BnO)o.unlink(id);this.objects=this.objects.filter(o=>o.id!==id)}find(id){return this.objects.find(o=>o.id===id)}unlinkAll(id){for(const o of this.objects)if(o instanceof BnO)o.unlink(id)}sorted(){return[...this.objects].sort((a,b)=>a.layer!==b.layer?a.layer-b.layer:a.zIndex-b.zIndex)}hitTest(wx,wy){return this.sorted().reverse().find(o=>o.hits(wx,wy))||null}dup(id){const o=this.find(id);if(!o)return null;const j=o.toJSON();j.id=uid();j.x+=20;j.y+=20;j.name+=" copy";const n=Room._mk(j);this.objects.push(n);return n}toJSON(){return{width:this.width,height:this.height,gridSize:this.gridSize,gridOn:this.gridOn,bgColor:this.bgColor,roomName:this.roomName,objects:this.objects.map(o=>o.toJSON()),player:this.player.toJSON(),soundMuted:this.soundMuted}}static _mk(o){switch(o.type){case"text":return new TxO(o);case"image":return new ImO(o);case"button":return new BnO(o);default:return new GO(o)}}static fromJSON(d){return new Room({...d,objects:(d.objects||[]).map(Room._mk),player:new Player(d.player||{})})}}
 
 // ── Tutorial ──
-function mkTut(){const w=1600,h=1200;const t=(id,x,y,text,o={})=>new TxO({id,x,y,width:o.w||200,height:o.h||28,text,fontSize:o.fs||12,color:o.c||"#333",bgColor:o.bg||"#fff9c4",name:o.n||text.slice(0,18),zIndex:o.z||0,...o});return new Room({width:w,height:h,roomName:"Tutorial Room",bgColor:"#f8f9fc",player:new Player({x:w/2,y:h/2,speed:3}),objects:[
-  t("t0",w/2-200,20,"Welcome to Room Builder!",{w:400,h:45,fs:28,bg:"#e0f7fa",c:"#006064",n:"Title"}),t("t0b",w/2-140,72,"Walk around with WASD!",{w:280,h:24,fs:13,bg:"",c:"#666",n:"Subtitle"}),
-  // Top-left toolbar
-  t("l1",10,52,"⬆️ Play/Edit",{w:100,h:24,fs:10,bg:"#bbdefb"}),t("l2",115,52,"⬆️ Camera",{w:85,h:24,fs:10,bg:"#bbdefb"}),t("l3",205,52,"⬆️ Grid",{w:65,h:24,fs:10,bg:"#bbdefb"}),t("l4",275,52,"⬆️ Hidden",{w:80,h:24,fs:10,bg:"#bbdefb"}),t("l5",360,52,"⬆️ Undo",{w:65,h:24,fs:10,bg:"#bbdefb"}),t("l6",430,52,"⬆️ Redo",{w:65,h:24,fs:10,bg:"#bbdefb"}),t("l7",500,52,"⬆️ Zoom",{w:70,h:24,fs:10,bg:"#bbdefb"}),
-  // Top-right toolbar
-  t("r1",w-330,52,"⬆️ Settings",{w:80,h:24,fs:10,bg:"#c8e6c9"}),t("r2",w-245,52,"⬆️ Save",{w:70,h:24,fs:10,bg:"#c8e6c9"}),t("r3",w-170,52,"⬆️ Share",{w:75,h:24,fs:10,bg:"#c8e6c9"}),
-  // Sidebar
-  t("s0",15,120,"⬅️ Sidebar",{w:110,h:26,fs:13,bg:"#e8eaf6",c:"#283593"}),t("s1",15,150,"Add objects",{w:100,h:20,fs:10,bg:"",c:"#555"}),t("s2",15,172,"Edit properties",{w:110,h:20,fs:10,bg:"",c:"#555"}),t("s3",15,194,"Object layers",{w:100,h:20,fs:10,bg:"",c:"#555"}),
-  // Controls
-  t("c0",15,240,"🎮 Controls",{w:120,h:26,fs:14,bg:"#e3f2fd",c:"#0d47a1"}),t("c1",15,272,"WASD = Move",{w:110,h:20,fs:10,bg:"",c:"#444"}),t("c2",15,294,"E = Interact",{w:105,h:20,fs:10,bg:"",c:"#444"}),t("c3",15,316,"Scroll = Zoom",{w:110,h:20,fs:10,bg:"",c:"#444"}),t("c4",15,338,"Del = Delete",{w:105,h:20,fs:10,bg:"",c:"#444"}),t("c5",15,360,"Ctrl+D = Copy",{w:115,h:20,fs:10,bg:"",c:"#444"}),t("c6",15,382,"Ctrl+Z = Undo",{w:115,h:20,fs:10,bg:"",c:"#444"}),
-  // Buttons demo
-  t("b0",520,130,"Try the buttons!",{w:200,h:30,fs:17,bg:"#f3e5f5",c:"#4a148c"}),
-  t("b1",520,175,"🔴 Press E",{w:130,h:24,fs:12,bg:"#ffebee",c:"#c62828"}),t("b1a",660,177,"⬇️",{w:26,h:22,fs:13,bg:"",c:"#c62828"}),
-  new BnO({id:"be",x:660,y:203,buttonType:BT.E,linkedIds:["bes"],name:"Press E demo"}),
-  new TxO({id:"bes",x:520,y:205,width:130,height:26,text:"🎉 Found me!",fontSize:13,color:"#2e7d32",bgColor:"#e8f5e9",visible:false,name:"E secret"}),
-  t("b2",520,255,"🟠 Floor Toggle",{w:140,h:24,fs:12,bg:"#fff3e0",c:"#e65100"}),t("b2a",670,257,"⬇️",{w:26,h:22,fs:13,bg:"",c:"#e65100"}),
-  new BnO({id:"bf",x:665,y:283,width:48,height:48,buttonType:BT.FT,linkedIds:["bfs"],name:"Floor Toggle demo"}),
-  new TxO({id:"bfs",x:520,y:290,width:130,height:26,text:"Toggled!",fontSize:13,color:"#e65100",bgColor:"#fff3e0",visible:false,name:"F secret"}),
-  t("b3",520,345,"🟣 Floor Hold",{w:130,h:24,fs:12,bg:"#f3e5f5",c:"#6a1b9a"}),t("b3a",660,347,"⬇️",{w:26,h:22,fs:13,bg:"",c:"#6a1b9a"}),
-  new BnO({id:"bh",x:655,y:373,width:48,height:48,buttonType:BT.FH,linkedIds:["bhs"],name:"Floor Hold demo"}),
-  new TxO({id:"bhs",x:520,y:380,width:140,height:26,text:"Only while on it!",fontSize:13,color:"#6a1b9a",bgColor:"#f3e5f5",visible:false,name:"H secret"}),
-  // Features
-  t("f0",870,130,"✨ Features",{w:140,h:28,fs:15,bg:"#e8eaf6",c:"#1a237e"}),
-  t("f1",870,165,"Custom sprites",{w:130,h:20,fs:10,bg:"",c:"#444"}),t("f2",870,187,"Button images",{w:120,h:20,fs:10,bg:"",c:"#444"}),t("f3",870,209,"Sound effects",{w:115,h:20,fs:10,bg:"",c:"#444"}),t("f4",870,231,"Embed links",{w:105,h:20,fs:10,bg:"",c:"#444"}),t("f5",870,253,"Font styling",{w:100,h:20,fs:10,bg:"",c:"#444"}),t("f6",870,275,"6 themes",{w:85,h:20,fs:10,bg:"",c:"#444"}),t("f7",870,297,"GIF support",{w:100,h:20,fs:10,bg:"",c:"#444"}),t("f8",870,319,"Cloud sharing",{w:110,h:20,fs:10,bg:"",c:"#444"}),t("f9",870,341,"Grid + layers",{w:105,h:20,fs:10,bg:"",c:"#444"}),t("f10",870,363,"Mobile D-pad",{w:105,h:20,fs:10,bg:"",c:"#444"}),
-  // Settings box
-  t("s10",870,400,"⚙️ Settings has:",{w:140,h:24,fs:12,bg:"#fce4ec",c:"#880e4f"}),t("s11",870,428,"Player speed",{w:100,h:20,fs:10,bg:"",c:"#444"}),t("s12",870,450,"Themes",{w:70,h:20,fs:10,bg:"",c:"#444"}),t("s13",870,472,"Room bg color",{w:110,h:20,fs:10,bg:"",c:"#444"}),t("s14",870,494,"Clear / Tutorial",{w:120,h:20,fs:10,bg:"",c:"#444"}),
-  // Start marker
-  t("st",w/2-55,h/2+28,"↑ You are here",{w:110,h:22,fs:11,bg:"rgba(0,135,168,0.08)",c:"#0087a8"}),
-]})}
+// Inline SVG data URLs for demo images (no external deps needed)
+const _SVG_STAR='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="12" fill="#fef3c7"/><text x="50" y="58" text-anchor="middle" font-size="48">⭐</text></svg>');
+const _SVG_TREE='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="12" fill="#dcfce7"/><text x="50" y="58" text-anchor="middle" font-size="48">🌳</text></svg>');
+const _SVG_CAT='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="12" fill="#ede9fe"/><text x="50" y="58" text-anchor="middle" font-size="48">🐱</text></svg>');
+const _SVG_LINK='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 50"><rect width="120" height="50" rx="8" fill="#dbeafe"/><text x="60" y="30" text-anchor="middle" font-size="14" fill="#1e40af" font-family="sans-serif">Click me! 🔗</text></svg>');
 
+function mkTut(){
+  const w=2800,h=2400;
+  // px = player X center, py = player Y center
+  const px=700,py=900;
+  // Text helper: creates a styled text label
+  const t=(id,x,y,text,o={})=>new TxO({id,x,y,width:o.w||220,height:o.h||34,text,fontSize:o.fs||15,color:o.c||"#333",bgColor:o.bg||"",name:o.n||text.slice(0,20),zIndex:o.z||5,fontFamily:o.ff||"sans-serif",bold:o.b||false,italic:o.it||false,underline:o.ul||false,strike:o.st||false,...o});
+
+  const objs=[
+  // ╔═══════════════════════════════════════════════╗
+  // ║  ZONE 1: WELCOME & CONTROLS (near player)    ║
+  // ╚═══════════════════════════════════════════════╝
+
+  // Welcome banner (big, right above player)
+  t("w1",px-250,py-220,"Welcome to Room Builder!",{w:500,h:65,fs:34,bg:"#e0f7fa",c:"#00695c",b:true,n:"Welcome"}),
+  t("w2",px-180,py-148,"Use WASD to move. Explore the room!",{w:360,h:32,fs:16,bg:"",c:"#546e7a",n:"Explore hint"}),
+
+  // Player spawn marker
+  t("w3",px-70,py+30,"↑ You spawn here",{w:140,h:28,fs:14,bg:"rgba(0,135,168,0.1)",c:"#0087a8",n:"Spawn"}),
+
+  // Objects spawn marker (center of room)
+  t("w3b",w/2-100,h/2-14,"New objects appear here",{w:200,h:28,fs:13,bg:"rgba(156,39,176,0.08)",c:"#7b1fa2",n:"Obj spawn"}),
+  t("w3c",w/2-20,h/2+18,"✦",{w:40,h:28,fs:20,bg:"",c:"#7b1fa2",n:"Obj dot"}),
+
+  // Controls box (right next to player)
+  t("c0",px+120,py-180,"🎮 Controls",{w:200,h:40,fs:22,bg:"#e3f2fd",c:"#0d47a1",b:true,n:"Controls"}),
+  t("c1",px+120,py-132,"W A S D  =  Move around",{w:240,h:28,fs:15,bg:"#e3f2fd",c:"#1565c0",n:"WASD"}),
+  t("c2",px+120,py-100,"E  =  Interact with buttons",{w:260,h:28,fs:15,bg:"#e3f2fd",c:"#1565c0",n:"E key"}),
+  t("c3",px+120,py-68,"Scroll  =  Zoom in / out",{w:240,h:28,fs:15,bg:"#e3f2fd",c:"#1565c0",n:"Scroll"}),
+  t("c4",px+120,py-36,"Delete  =  Remove object",{w:240,h:28,fs:15,bg:"#e3f2fd",c:"#1565c0",n:"Delete"}),
+  t("c5",px+120,py-4,"Ctrl+D  =  Duplicate",{w:220,h:28,fs:15,bg:"#e3f2fd",c:"#1565c0",n:"Ctrl+D"}),
+  t("c6",px+120,py+28,"Ctrl+Z  =  Undo",{w:200,h:28,fs:15,bg:"#e3f2fd",c:"#1565c0",n:"Ctrl+Z"}),
+  t("c7",px+120,py+60,"Escape  =  Deselect",{w:220,h:28,fs:15,bg:"#e3f2fd",c:"#1565c0",n:"Escape"}),
+
+  t("c8",px+120,py+110,"Walk around and explore!",{w:260,h:34,fs:16,bg:"",c:"#f57f17",b:true,it:true,n:"Explore CTA"}),
+  t("c9",px+120,py+148,"Each zone teaches a feature →",{w:290,h:28,fs:14,bg:"",c:"#888",n:"Zones hint"}),
+
+  // ╔═══════════════════════════════════════════════╗
+  // ║  ZONE 2: TOOLBAR (top area, arrows point up) ║
+  // ╚═══════════════════════════════════════════════╝
+
+  // Section header
+  t("tb0",100,60,"📐 Toolbar Guide",{w:240,h:40,fs:22,bg:"#fff9c4",c:"#f57f17",b:true,z:10,n:"Toolbar title"}),
+
+  // Top-left group
+  t("tb1",30,115,"⬆️ Play / Edit",{w:140,h:30,fs:14,bg:"#fff9c4",c:"#e65100",n:"Mode"}),
+  t("tb1d",30,150,"Switch between building and playing",{w:260,h:26,fs:12,bg:"",c:"#777",n:"Mode desc"}),
+
+  t("tb2",190,115,"⬆️ Camera",{w:110,h:30,fs:14,bg:"#fff9c4",c:"#e65100",n:"Camera"}),
+  t("tb2d",190,150,"Follow player or pan freely",{w:230,h:26,fs:12,bg:"",c:"#777",n:"Cam desc"}),
+
+  t("tb3",320,115,"⬆️ Grid",{w:80,h:30,fs:14,bg:"#fff9c4",c:"#e65100",n:"Grid"}),
+  t("tb4",415,115,"⬆️ Hidden",{w:100,h:30,fs:14,bg:"#fff9c4",c:"#e65100",n:"Hidden"}),
+  t("tb34d",320,150,"Grid snaps objects. Hidden shows invisible ones.",{w:350,h:26,fs:12,bg:"",c:"#777",n:"Grid desc"}),
+
+  t("tb5",540,115,"⬆️ Undo",{w:80,h:30,fs:14,bg:"#c8e6c9",c:"#2e7d32",n:"Undo"}),
+  t("tb6",630,115,"⬆️ Redo",{w:80,h:30,fs:14,bg:"#c8e6c9",c:"#2e7d32",n:"Redo"}),
+  t("tb7",720,115,"⬆️ Zoom",{w:80,h:30,fs:14,bg:"#c8e6c9",c:"#2e7d32",n:"Zoom"}),
+
+  // Top-right group
+  t("tb8",w-450,115,"⬆️ Settings",{w:110,h:30,fs:14,bg:"#fce4ec",c:"#c62828",n:"Settings"}),
+  t("tb9",w-330,115,"⬆️ Save",{w:80,h:30,fs:14,bg:"#fce4ec",c:"#c62828",n:"Save"}),
+  t("tb10",w-240,115,"⬆️ Share",{w:90,h:30,fs:14,bg:"#fce4ec",c:"#c62828",n:"Share"}),
+  t("tbrd",w-450,150,"Save locally, export JSON, or share online",{w:340,h:26,fs:12,bg:"",c:"#777",n:"Save desc"}),
+
+  // ╔═══════════════════════════════════════════════╗
+  // ║  ZONE 3: SIDEBAR (left area)                  ║
+  // ╚═══════════════════════════════════════════════╝
+
+  t("sb0",30,240,"⬅️ Sidebar (Edit mode)",{w:260,h:40,fs:20,bg:"#e8eaf6",c:"#283593",b:true,n:"Sidebar"}),
+  t("sb1",30,290,"Add Tab:",{w:100,h:28,fs:15,bg:"",c:"#333",b:true,n:"Add tab"}),
+  t("sb2",30,322,"• Add text labels",{w:180,h:26,fs:14,bg:"",c:"#555",n:"Add text"}),
+  t("sb3",30,350,"• Add images & GIFs",{w:190,h:26,fs:14,bg:"",c:"#555",n:"Add img"}),
+  t("sb4",30,378,"• Add interactive buttons",{w:230,h:26,fs:14,bg:"",c:"#555",n:"Add btn"}),
+  t("sb5",30,406,"• Set room size & grid",{w:210,h:26,fs:14,bg:"",c:"#555",n:"Room size"}),
+  t("sb6",30,436,"• Browse all objects",{w:190,h:26,fs:14,bg:"",c:"#555",n:"Obj list"}),
+  t("sb7",30,476,"Props Tab:",{w:120,h:28,fs:15,bg:"",c:"#333",b:true,n:"Props tab"}),
+  t("sb8",30,508,"• Move, resize, rotate",{w:210,h:26,fs:14,bg:"",c:"#555",n:"Transform"}),
+  t("sb9",30,536,"• All controls have sliders!",{w:260,h:26,fs:14,bg:"",c:"#555",n:"Sliders"}),
+  t("sb10",30,564,"• Change fonts & colors",{w:220,h:26,fs:14,bg:"",c:"#555",n:"Fonts"}),
+  t("sb11",30,592,"• Link buttons to objects",{w:240,h:26,fs:14,bg:"",c:"#555",n:"Link"}),
+  t("sb12",30,620,"• Embed URLs on objects",{w:230,h:26,fs:14,bg:"",c:"#555",n:"Embed"}),
+  t("sb13",30,648,"• Set layers & z-index",{w:210,h:26,fs:14,bg:"",c:"#555",n:"Layers"}),
+
+  // ╔══════════════════════════════════════════════════════╗
+  // ║  ZONE 4: INTERACTIVE BUTTONS (right of player)      ║
+  // ╚══════════════════════════════════════════════════════╝
+
+  t("bt0",1150,200,"🎯 Interactive Buttons",{w:340,h:48,fs:26,bg:"#f3e5f5",c:"#4a148c",b:true,n:"Buttons title"}),
+  t("bt0d",1150,255,"Buttons control object visibility.",{w:340,h:28,fs:15,bg:"",c:"#666",n:"Btn intro"}),
+  t("bt0e",1150,285,"Link a button to objects — they hide/show!",{w:370,h:28,fs:14,bg:"",c:"#888",n:"Btn intro 2"}),
+
+  // ── Press E ──
+  t("be0",1150,340,"🔴 Press E Button",{w:220,h:36,fs:19,bg:"#ffebee",c:"#b71c1c",b:true,n:"E title"}),
+  t("be1",1150,382,"Walk near it, then press E.",{w:270,h:28,fs:15,bg:"",c:"#555",n:"E instr"}),
+  t("be2",1150,414,"It toggles on/off each press.",{w:280,h:28,fs:14,bg:"",c:"#888",n:"E detail"}),
+  t("be3",1150,450,"Try it! →",{w:100,h:28,fs:16,bg:"",c:"#b71c1c",b:true,n:"E try"}),
+  new BnO({id:"tbe",x:1270,y:446,width:52,height:52,buttonType:BT.E,linkedIds:["tbe_s"],name:"Demo Press E"}),
+  new TxO({id:"tbe_s",x:1340,y:450,width:200,height:40,text:"🎉 You pressed E!",fontSize:18,color:"#2e7d32",bgColor:"#e8f5e9",visible:false,name:"E revealed"}),
+
+  // ── Floor Toggle ──
+  t("bf0",1150,530,"🟠 Floor Toggle",{w:200,h:36,fs:19,bg:"#fff3e0",c:"#e65100",b:true,n:"FT title"}),
+  t("bf1",1150,572,"Walk onto the button.",{w:220,h:28,fs:15,bg:"",c:"#555",n:"FT instr"}),
+  t("bf2",1150,604,"Toggles each time you step on it.",{w:310,h:28,fs:14,bg:"",c:"#888",n:"FT detail"}),
+  t("bf3",1150,640,"Step on! →",{w:110,h:28,fs:16,bg:"",c:"#e65100",b:true,n:"FT try"}),
+  new BnO({id:"tbf",x:1280,y:636,width:56,height:56,buttonType:BT.FT,linkedIds:["tbf_s"],name:"Demo Floor Toggle"}),
+  new TxO({id:"tbf_s",x:1350,y:642,width:220,height:40,text:"🔀 Toggled by walking!",fontSize:17,color:"#e65100",bgColor:"#fff3e0",visible:false,name:"FT revealed"}),
+
+  // ── Floor Hold ──
+  t("bh0",1150,720,"🟣 Floor Hold",{w:180,h:36,fs:19,bg:"#f3e5f5",c:"#6a1b9a",b:true,n:"FH title"}),
+  t("bh1",1150,762,"Stand on the button.",{w:220,h:28,fs:15,bg:"",c:"#555",n:"FH instr"}),
+  t("bh2",1150,794,"Only visible while you stand on it!",{w:320,h:28,fs:14,bg:"",c:"#888",n:"FH detail"}),
+  t("bh3",1150,830,"Stand here! →",{w:130,h:28,fs:16,bg:"",c:"#6a1b9a",b:true,n:"FH try"}),
+  new BnO({id:"tbh",x:1300,y:826,width:56,height:56,buttonType:BT.FH,linkedIds:["tbh_s"],name:"Demo Floor Hold"}),
+  new TxO({id:"tbh_s",x:1370,y:830,width:240,height:40,text:"👀 Only while standing!",fontSize:17,color:"#6a1b9a",bgColor:"#f3e5f5",visible:false,name:"FH revealed"}),
+
+  // ╔══════════════════════════════════════════════════════╗
+  // ║  ZONE 5: TEXT STYLING SHOWCASE (below player)       ║
+  // ╚══════════════════════════════════════════════════════╝
+
+  t("ts0",100,800,"✏️ Text Styling Examples",{w:340,h:48,fs:24,bg:"#e8f5e9",c:"#1b5e20",b:true,n:"Text title"}),
+  t("ts0d",100,855,"In Edit mode, select text → Props tab",{w:340,h:28,fs:14,bg:"",c:"#666",n:"Text how"}),
+
+  // Font examples
+  t("ts1",100,900,"Sans Serif (default)",{w:240,h:34,fs:18,bg:"#f1f8e9",c:"#33691e",ff:"sans-serif",n:"Sans"}),
+  t("ts2",100,940,"Serif — elegant",{w:220,h:34,fs:18,bg:"#f1f8e9",c:"#33691e",ff:"serif",n:"Serif"}),
+  t("ts3",100,980,"Monospace — code",{w:230,h:34,fs:18,bg:"#f1f8e9",c:"#33691e",ff:"monospace",n:"Mono"}),
+  t("ts4",100,1020,"Cursive — fancy",{w:210,h:34,fs:18,bg:"#f1f8e9",c:"#33691e",ff:"cursive",n:"Cursive"}),
+  t("ts5",100,1060,"Georgia — classic",{w:220,h:34,fs:18,bg:"#f1f8e9",c:"#33691e",ff:"'Georgia',serif",n:"Georgia"}),
+
+  // Style examples
+  t("ts6",100,1110,"Bold text",{w:140,h:34,fs:18,bg:"#e3f2fd",c:"#0d47a1",b:true,n:"Bold ex"}),
+  t("ts7",250,1110,"Italic text",{w:140,h:34,fs:18,bg:"#e3f2fd",c:"#0d47a1",it:true,n:"Italic ex"}),
+  t("ts8",400,1110,"Underlined",{w:150,h:34,fs:18,bg:"#e3f2fd",c:"#0d47a1",ul:true,n:"Under ex"}),
+  t("ts9",560,1110,"Strikethrough",{w:170,h:34,fs:18,bg:"#e3f2fd",c:"#0d47a1",st:true,n:"Strike ex"}),
+
+  // Color examples
+  t("ts10",100,1160,"Red text",{w:120,h:34,fs:18,bg:"",c:"#d32f2f",b:true,n:"Red"}),
+  t("ts11",230,1160,"Blue text",{w:120,h:34,fs:18,bg:"",c:"#1565c0",b:true,n:"Blue"}),
+  t("ts12",360,1160,"Green text",{w:130,h:34,fs:18,bg:"",c:"#2e7d32",b:true,n:"Green"}),
+
+  // BG color examples
+  t("ts13",100,1210,"Background colors →",{w:210,h:32,fs:15,bg:"",c:"#555",n:"BG intro"}),
+  t("ts14",320,1210,"Yellow BG",{w:120,h:32,fs:15,bg:"#fff9c4",c:"#333",n:"BG yellow"}),
+  t("ts15",450,1210,"Pink BG",{w:110,h:32,fs:15,bg:"#fce4ec",c:"#333",n:"BG pink"}),
+  t("ts16",570,1210,"Blue BG",{w:110,h:32,fs:15,bg:"#bbdefb",c:"#333",n:"BG blue"}),
+
+  // Size examples
+  t("ts17",100,1260,"Size 12",{w:80,h:22,fs:12,bg:"",c:"#666",n:"S12"}),
+  t("ts18",190,1255,"Size 20",{w:110,h:30,fs:20,bg:"",c:"#444",n:"S20"}),
+  t("ts19",310,1248,"Size 28",{w:140,h:40,fs:28,bg:"",c:"#333",n:"S28"}),
+  t("ts20",460,1240,"Big!",{w:110,h:52,fs:40,bg:"",c:"#222",b:true,n:"Big"}),
+
+  // ╔══════════════════════════════════════════════════════╗
+  // ║  ZONE 6: IMAGES & EMBEDS (bottom right)             ║
+  // ╚══════════════════════════════════════════════════════╝
+
+  t("im0",1150,950,"🖼️ Images & Embeds",{w:300,h:48,fs:24,bg:"#ede9fe",c:"#4a148c",b:true,n:"Img title"}),
+  t("im1",1150,1005,"Upload images, GIFs, and SVGs!",{w:310,h:28,fs:15,bg:"",c:"#666",n:"Img desc"}),
+  t("im2",1150,1040,"Example images (SVG icons):",{w:280,h:28,fs:14,bg:"",c:"#888",n:"Img examples"}),
+
+  // Demo images
+  new ImO({id:"timg1",x:1150,y:1080,width:80,height:80,src:_SVG_STAR,name:"Star image"}),
+  new ImO({id:"timg2",x:1250,y:1080,width:80,height:80,src:_SVG_TREE,name:"Tree image"}),
+  new ImO({id:"timg3",x:1350,y:1080,width:80,height:80,src:_SVG_CAT,name:"Cat image"}),
+
+  t("im3",1150,1175,"Images can be resized, rotated,",{w:310,h:28,fs:14,bg:"",c:"#666",n:"Img feat 1"}),
+  t("im4",1150,1205,"flipped, and layered!",{w:220,h:28,fs:14,bg:"",c:"#666",n:"Img feat 2"}),
+
+  // Embed link demo
+  t("em0",1150,1260,"🔗 Embed Links",{w:220,h:40,fs:20,bg:"#dbeafe",c:"#1e40af",b:true,n:"Embed title"}),
+  t("em1",1150,1310,"Add URLs to text or images.",{w:280,h:28,fs:15,bg:"",c:"#555",n:"Embed desc"}),
+  t("em2",1150,1342,"In Play mode, click to open link!",{w:300,h:28,fs:14,bg:"",c:"#888",n:"Embed how"}),
+  t("em3",1150,1376,"Cursor changes to pointer →",{w:270,h:28,fs:14,bg:"",c:"#888",n:"Embed cursor"}),
+
+  // Clickable demo link image
+  new ImO({id:"tembed",x:1440,y:1364,width:140,height:50,src:_SVG_LINK,name:"Link demo",link:"https://github.com"}),
+
+  // Button with image demo
+  t("bi0",1150,1440,"🎨 Custom Button Images",{w:310,h:40,fs:20,bg:"#fce4ec",c:"#880e4f",b:true,n:"Btn img title"}),
+  t("bi1",1150,1490,"Upload images for ON and OFF states!",{w:340,h:28,fs:14,bg:"",c:"#666",n:"Btn img desc"}),
+  t("bi2",1150,1522,"Select button → Props → Images",{w:300,h:28,fs:14,bg:"",c:"#888",n:"Btn img how"}),
+  t("bi3",1150,1554,"Also upload custom sound effects!",{w:300,h:28,fs:14,bg:"",c:"#888",n:"Btn snd desc"}),
+
+  // ╔══════════════════════════════════════════════════════╗
+  // ║  ZONE 7: SETTINGS GUIDE (bottom left)               ║
+  // ╚══════════════════════════════════════════════════════╝
+
+  t("st0",100,1380,"⚙️ Settings (gear icon, top right)",{w:380,h:48,fs:22,bg:"#fce4ec",c:"#880e4f",b:true,n:"Settings title"}),
+
+  t("st1",100,1440,"🎨 Color Themes",{w:190,h:32,fs:16,bg:"#fce4ec",c:"#ad1457",b:true,n:"Theme"}),
+  t("st1d",100,1478,"Light, Dark, Ocean, Forest, Sunset, Lavender",{w:400,h:28,fs:14,bg:"",c:"#666",n:"Theme list"}),
+
+  t("st2",100,1520,"🏃 Player Settings",{w:200,h:32,fs:16,bg:"#fce4ec",c:"#ad1457",b:true,n:"Player set"}),
+  t("st2d",100,1558,"Speed slider, size, color picker",{w:310,h:28,fs:14,bg:"",c:"#666",n:"Player opts"}),
+  t("st2e",100,1590,"Upload 2-frame custom sprites!",{w:290,h:28,fs:14,bg:"",c:"#666",n:"Sprites"}),
+  t("st2f",100,1622,"Sprite flips horizontally — stays upright",{w:360,h:28,fs:14,bg:"",c:"#888",n:"Sprite flip"}),
+
+  t("st3",100,1664,"🔊 Audio",{w:120,h:32,fs:16,bg:"#fce4ec",c:"#ad1457",b:true,n:"Audio"}),
+  t("st3d",100,1702,"Mute/unmute all button sounds",{w:300,h:28,fs:14,bg:"",c:"#666",n:"Mute"}),
+
+  t("st4",100,1744,"🎨 Room Background",{w:220,h:32,fs:16,bg:"#fce4ec",c:"#ad1457",b:true,n:"Room bg"}),
+  t("st4d",100,1782,"Change the room background color",{w:310,h:28,fs:14,bg:"",c:"#666",n:"BG color"}),
+
+  t("st5",100,1824,"☁️ Cloud Status",{w:190,h:32,fs:16,bg:"#fce4ec",c:"#ad1457",b:true,n:"Cloud"}),
+  t("st5d",100,1862,"Shows if Supabase is connected",{w:300,h:28,fs:14,bg:"",c:"#666",n:"Cloud desc"}),
+
+  t("st6",100,1904,"🗑️ Reset / Tutorial",{w:220,h:32,fs:16,bg:"#fce4ec",c:"#ad1457",b:true,n:"Reset"}),
+  t("st6d",100,1942,"Clear room or restore this tutorial",{w:320,h:28,fs:14,bg:"",c:"#666",n:"Reset desc"}),
+
+  // ╔══════════════════════════════════════════════════════╗
+  // ║  ZONE 8: CLOUD SHARING GUIDE (bottom center)        ║
+  // ╚══════════════════════════════════════════════════════╝
+
+  t("cl0",700,1440,"☁️ Cloud Sharing",{w:270,h:48,fs:24,bg:"#e3f2fd",c:"#0d47a1",b:true,n:"Cloud title"}),
+
+  t("cl1",700,1500,"Share Tab",{w:120,h:32,fs:16,bg:"#e3f2fd",c:"#1565c0",b:true,n:"Share tab"}),
+  t("cl1d",700,1538,"Enter nickname + room name",{w:280,h:28,fs:14,bg:"",c:"#666",n:"Share nick"}),
+  t("cl1e",700,1568,"Choose Public or ID-Only",{w:260,h:28,fs:14,bg:"",c:"#666",n:"Share pub"}),
+  t("cl1f",700,1598,"All images upload to cloud!",{w:270,h:28,fs:14,bg:"",c:"#666",n:"Share img"}),
+  t("cl1g",700,1628,"Copy Link or Copy ID buttons",{w:280,h:28,fs:14,bg:"",c:"#666",n:"Share copy"}),
+
+  t("cl2",700,1676,"Browse Tab",{w:130,h:32,fs:16,bg:"#e3f2fd",c:"#1565c0",b:true,n:"Browse tab"}),
+  t("cl2d",700,1714,"See all public rooms",{w:210,h:28,fs:14,bg:"",c:"#666",n:"Browse desc"}),
+  t("cl2e",700,1744,"Search by name",{w:170,h:28,fs:14,bg:"",c:"#666",n:"Browse search"}),
+  t("cl2f",700,1774,"Shows creator + visit count",{w:270,h:28,fs:14,bg:"",c:"#666",n:"Browse visits"}),
+
+  t("cl3",700,1822,"Load ID Tab",{w:130,h:32,fs:16,bg:"#e3f2fd",c:"#1565c0",b:true,n:"Load tab"}),
+  t("cl3d",700,1860,"Paste a room ID or URL to load it",{w:310,h:28,fs:14,bg:"",c:"#666",n:"Load desc"}),
+
+  // ╔══════════════════════════════════════════════════════╗
+  // ║  ZONE 9: TIPS & TRICKS (bottom area)                ║
+  // ╚══════════════════════════════════════════════════════╝
+
+  t("tp0",700,1940,"💡 Tips & Tricks",{w:240,h:44,fs:22,bg:"#fff9c4",c:"#f57f17",b:true,n:"Tips title"}),
+
+  t("tp1",700,1996,"• Toggle Grid for precise placement",{w:340,h:28,fs:15,bg:"",c:"#555",n:"Tip grid"}),
+  t("tp2",700,2028,"• Use Show Hidden to see invisible objects",{w:400,h:28,fs:15,bg:"",c:"#555",n:"Tip hidden"}),
+  t("tp3",700,2060,"• Layer + Z-index control what's on top",{w:370,h:28,fs:15,bg:"",c:"#555",n:"Tip layers"}),
+  t("tp4",700,2092,"• Save often! Export JSON as backup",{w:350,h:28,fs:15,bg:"",c:"#555",n:"Tip save"}),
+  t("tp5",700,2124,"• Mobile has a touchscreen D-pad",{w:330,h:28,fs:15,bg:"",c:"#555",n:"Tip mobile"}),
+  t("tp6",700,2156,"• Restore this tutorial from Settings anytime",{w:400,h:28,fs:15,bg:"",c:"#555",n:"Tip restore"}),
+
+  // Done message
+  t("dn",w/2-200,h-80,"You've seen everything! Switch to Edit mode and start building!",{w:400,h:40,fs:16,bg:"#e0f7fa",c:"#00695c",b:true,n:"Done"}),
+  ];
+
+  return new Room({width:w,height:h,roomName:"Tutorial Room",bgColor:"#f8f9fc",
+    player:new Player({x:px,y:py,speed:3}),objects:objs});
+}
 class Hist{constructor(m=60){this.u=[];this.r=[];this.m=m}push(j){this.u.push(JSON.stringify(j));if(this.u.length>this.m)this.u.shift();this.r=[]}undo(c){if(!this.u.length)return null;this.r.push(JSON.stringify(c));return JSON.parse(this.u.pop())}redo(c){if(!this.r.length)return null;this.u.push(JSON.stringify(c));return JSON.parse(this.r.pop())}}
 
 // ── Cloud ──
@@ -156,7 +395,7 @@ return(<div className="fixed inset-0 z-[90] flex items-center justify-center" on
 </div></div></div>)}
 
 // ── MAIN APP ──
-export default function App(){const[tn,setTn]=useState(()=>localStorage.getItem("rb_theme")||"light");const T=TH[tn]||TH.light;const cloud=useMemo(()=>new Cld(SB_URL,SB_KEY),[]);const[room,setRoom]=useState(()=>{if(!localStorage.getItem("rb_v4")){localStorage.setItem("rb_v4","1");return mkTut()}return Ser.load()||mkTut()});const[ed,setEd]=useState(false);const[si,setSi]=useState(null);const[sH,setSH]=useState(false);const[cF,setCF]=useState(true);const[zm,setZm]=useState(1);const[cP,setCP]=useState({x:ROOM_W/2,y:ROOM_H/2});const[lk,setLk]=useState(false);const[hI,setHI]=useState(null);const[toast,setToast]=useState(null);const[tT,setTT]=useState("info");const[sSv,setSSv]=useState(false);const[sSh,setSSh]=useState(false);const[sSt,setSSt]=useState(false);const[mob,setMob]=useState(false);const[sb,setSb]=useState(true);const[tab,setTab]=useState("add");const[cur,setCur]=useState("crosshair");
+export default function App(){const[tn,setTn]=useState(()=>localStorage.getItem("rb_theme")||"light");const T=TH[tn]||TH.light;const cloud=useMemo(()=>new Cld(SB_URL,SB_KEY),[]);const[room,setRoom]=useState(()=>{if(!localStorage.getItem("rb_v5")){localStorage.setItem("rb_v5","1");return mkTut()}return Ser.load()||mkTut()});const[ed,setEd]=useState(false);const[si,setSi]=useState(null);const[sH,setSH]=useState(false);const[cF,setCF]=useState(true);const[zm,setZm]=useState(0.85);const[cP,setCP]=useState({x:ROOM_W/2,y:ROOM_H/2});const[lk,setLk]=useState(false);const[hI,setHI]=useState(null);const[toast,setToast]=useState(null);const[tT,setTT]=useState("info");const[sSv,setSSv]=useState(false);const[sSh,setSSh]=useState(false);const[sSt,setSSt]=useState(false);const[mob,setMob]=useState(false);const[sb,setSb]=useState(true);const[tab,setTab]=useState("add");const[cur,setCur]=useState("crosshair");
 const cR=useRef(null);const rR=useRef(null);const rmR=useRef(room);const kR=useRef({});const hR=useRef(new Hist());const dR=useRef(null);const aR=useRef(null);const ctR=useRef(null);const[vp,setVp]=useState({w:800,h:600});const fR=useRef(null);rmR.current=room;const dt=useCallback((m,t="info")=>{setToast(m);setTT(t)},[]);
 useEffect(()=>{setMob("ontouchstart"in window||navigator.maxTouchPoints>0)},[]);
 useEffect(()=>{const p=new URLSearchParams(location.search);const rid=p.get("room");if(rid&&cloud.ok)cloud.loadRoom(rid).then(r=>{setRoom(r);setCP({x:r.width/2,y:r.height/2});dt("Loaded!","success");setEd(false)}).catch(()=>dt("Load failed","error"))},[]);
