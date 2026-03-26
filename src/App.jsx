@@ -15,6 +15,7 @@ import {
   ╚══════════════════════════════════════════════════════════════╝*/
 const SB_URL = "https://hnrkgqjedimvbnvvetwh.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhucmtncWplZGltdmJudnZldHdoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDg3NzEsImV4cCI6MjA5MDAyNDc3MX0.d6MHuoWFshhTlKy_LJWOLjJU5UcMWeUPj924dqllmWQ";
+
 /*  SQL to run in Supabase SQL Editor:
   CREATE TABLE rooms (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -138,7 +139,7 @@ function PP({obj,room,onChange,onDelete,onUA,lk,onTL}){const T=useContext(TC);if
 
 // ── Share Modal ──
 function SM({room,cloud,onClose,dt,onLoad,pH}){const T=useContext(TC);const[sav,setSav]=useState(false);const[sid,setSid]=useState(null);const[lid,setLid]=useState("");const[ldg,setLdg]=useState(false);const[rc,setRc]=useState([]);const[tab,setTab]=useState("share");const[nick,setNick]=useState(()=>localStorage.getItem("rb_nick")||"");const[rn,setRn]=useState(room.roomName);const[pub,setPub]=useState(true);const[srch,setSrch]=useState("");const doS=useCallback(q=>{if(cloud.ok)cloud.list(30,q).then(setRc).catch(()=>{})},[cloud]);useEffect(()=>{doS("")},[doS]);
-const share=async()=>{if(!nick.trim()){dt("Enter nickname","error");return}localStorage.setItem("rb_nick",nick);setSav(true);try{const rm2={...room};rm2.roomName=rn;const id=await cloud.saveRoom(rm2,nick.trim(),pub);setSid(id);try{await navigator.clipboard.writeText(`${location.origin}${location.pathname}?room=${id}`);dt("Link copied!","success")}catch{dt("Shared!","success")}}catch(e){dt("Failed: "+e.message,"error")}setSav(false)};
+const share=async()=>{if(!nick.trim()){dt("Enter nickname","error");return}localStorage.setItem("rb_nick",nick);setSav(true);try{room.roomName=rn;const id=await cloud.saveRoom(room,nick.trim(),pub);setSid(id);try{await navigator.clipboard.writeText(`${location.origin}${location.pathname}?room=${id}`);dt("Link copied!","success")}catch{dt("Shared!","success")}}catch(e){dt("Failed: "+e.message,"error")}setSav(false)};
 const load=async id=>{setLdg(true);try{pH();const r=await cloud.loadRoom(id);onLoad(r);dt("Loaded!","success");onClose()}catch(e){dt("Failed","error")}setLdg(false)};
 return(<div className="fixed inset-0 z-[90] flex items-center justify-center" onClick={onClose}><div className="absolute inset-0 bg-black/50"/><div className="relative rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" style={{background:T.sf,border:`1px solid ${T.bd}`}} onClick={e=>e.stopPropagation()}>
 <div className="flex items-center justify-between px-4 py-3" style={{borderBottom:`1px solid ${T.bd}`}}><div className="flex items-center gap-2"><Cloud size={16} color={T.ac}/><span className="font-semibold text-sm" style={{color:T.tx}}>Cloud</span></div><button onClick={onClose} style={{color:T.txM}}><X size={16}/></button></div>
